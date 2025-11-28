@@ -1,0 +1,8 @@
+.next/
+node_modules/
+public/scichart/
+npm-debug.log*
+yarn-error.log*
+.env
+.DS_Store
+.vscode/
