@@ -1,0 +1,12 @@
+.next/
+node_modules/
+npm-debug.log*
+yarn-error.log*
+.env
+.DS_Store
+.vscode/
+Pythony.code-workspace
+__pycache__/
+*.pyc
+venv/
+backend/venv/

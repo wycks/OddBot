@@ -9,10 +9,15 @@ import asyncio
 
 app = FastAPI()
 
-# Global Redis cache handle (may be None if connection failed)
+#    To change the data source:
+# - 1. Quick (env):  `CSV_PATH=path/to/file.csv`,
+# - 2. Direct edit: replace the `vbt.YFData.download(...)` call with your own loader
+# - 3. Vectorbt adapters: use other vectorbt data wrappers, there is 100 approx connectors.
+
+# Redis cache handle
 r_cache = None
 
-# In-memory cache (fast RAM cache). Keys: bytes -> packed msgpack bytes
+# In-memory cache (fast RAM cache)
 cache_mem = {}
 
 # Allow Frontend to connect
@@ -28,10 +33,10 @@ app.add_middleware(
 try:
     r_cache = redis.Redis(host='localhost', port=6379, db=0)
     r_cache.ping()
-    print("✅ Connected to Redis Speed Layer")
+    print("Connected to Redis Speed Layer")
 except Exception as e:
     r_cache = None
-    print(f"❌ Redis Connection Failed: {e}")
+    print(f" Redis Connection Failed: {e}")
 
 
 @app.get("/health")
@@ -48,16 +53,18 @@ async def health_check():
         status["redis"] = "down"
     return status
 
-# Pre-load Data into RAM (Simulating Hedge Fund Cache)
-print("⏳ Pre-loading Market Data...")
+# Pre-load Data into RAM (Simulating Hedge Fund Cache) from YFData = Yahoo Finance
+print("Pre-loading Market Data...")
 # Fetching 1 year of hourly data for speed demo
 price_data = vbt.YFData.download("BTC-USD", period="1y", interval="1h").get('Close')
-print("✅ Data Loaded into RAM")
+print("Data Loaded into RAM")
+
+#  TODO Add save to DB functionality
 
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
     await websocket.accept()
-    print("⚡ Client Connected via WebSocket")
+    print("Client Connected via WebSocket")
     
     try:
         while True:
@@ -73,24 +80,24 @@ async def websocket_endpoint(websocket: WebSocket):
             # 3. Try in-memory cache first (fastest)
             cached = cache_mem.get(cache_key)
             if cached:
-                print(f"♻️ In-memory cache hit for {cache_key.decode()}")
+                print(f"In-memory cache hit for {cache_key.decode()}")
                 await websocket.send_bytes(cached)
                 continue
 
-            # 4. Try to read from Redis cache (best-effort)
+            # 4. Try to read from Redis cache 
             if r_cache is not None:
                 try:
                     r = r_cache.get(cache_key)
                     if r:
-                        print(f"♻️ Redis cache hit for {cache_key.decode()}")
+                        print(f"Redis cache hit for {cache_key.decode()}")
                         # populate in-memory cache as well
                         cache_mem[cache_key] = r
                         await websocket.send_bytes(r)
                         continue
                 except Exception as e:
-                    print(f"❌ Redis read error: {e}")
+                    print(f"Redis read error: {e}")
 
-            # 5. Run VectorBT (heavy, run off the event loop)
+            # 5. Run VectorBT 
             def run_backtest(window_arg):
                 fast_ma = vbt.MA.run(price_data, window=window_arg)
                 entries = fast_ma.ma_crossed_above(price_data)
@@ -121,7 +128,7 @@ async def websocket_endpoint(websocket: WebSocket):
                     r_cache.set(cache_key, packed, ex=60)  # cache 60s
                     print(f"💾 Cached result for {cache_key.decode()}")
                 except Exception as e:
-                    print(f"❌ Redis write error: {e}")
+                    print(f"Redis write error: {e}")
 
             # 6. Send Binary Response
             await websocket.send_bytes(packed)

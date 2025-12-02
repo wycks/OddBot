@@ -1,37 +1,42 @@
-# Architecture & Stack Overview
-
 ## Project Philosophy
 
-This is a **Hedge-Fund Grade** SaaS application designed for high-frequency strategy backtesting and execution. The core architectural constraint is **ultra-low latency**. We prioritize data locality, in-memory processing, and binary transport protocols to achieve near-native desktop performance in the browser.
+Designed for high-frequency strategy backtesting and execution. The core architectural constraint is **ultra-low latency**.
 
-## The Architecture: "The Speed Stack"
+## TODO: Add AI integration, for LLM based contests running on cron
 
-### 1. The Frontend (Visual Layer)
+1. Add AI chat interface --> trading schema (zod)
+2. Confirm startegy - Loopback (natural language)
+3. Turn schema into API request (simulate)
+4. Cron every x hours
+
+## The Architecture:
+
+### 1. Frontend (Visual Layer)
 
 - **Framework:** **Next.js (React)**. Handles the UI shell, routing, and user state.
-- **Visualization Engine:** **SciChart.js**.
+- **Visualization Engine:** **Apache ECharts**.
   - **Role:** Renders massive financial datasets (millions of data points) at 60 FPS.
   - **Mechanism:** Uses WebGL and WebAssembly (Wasm).
-  - **Optimization:** Bypasses standard JSON parsing. It accepts **Raw Memory Buffers** (Float64Arrays) directly from the backend for zero-copy rendering.
+  - **Optimization:** Bypasses standard JSON parsing. Accepts **Raw Memory Buffers** (Float64Arrays) directly from the backend for zero-copy rendering.
 
-### 2. The Backend (Compute Layer)
+### 2. Backend (Compute Layer)
 
 - **Runtime:** **Python 3.13**.
-- **API Server:** **FastAPI** running on **Uvicorn**. Optimized for asynchronous WebSocket handling.
+- **API Server:** **FastAPI** running on **Uvicorn**. Optimized for asynchronous WebSocket handling. Inside local Docker.
 - **Math Engine:** **VectorBT**.
   - **Role:** Performs vectorized backtesting and signal generation using NumPy/Pandas.
   - **Optimization:** Operates entirely on in-memory arrays. Avoids iterative loops.
-- **Data Source:** **YFinance** (for MVP data fetching) / CCXT (for live execution).
+- **Data Source:** **YFinance** (for MVP data fetching- Very basic / Free) / CCXT/Alpaca for live execution, not integrated yet.
 
-### 3. The Protocol (Communication Layer)
+### 3. Comms Layer
 
-- **Transport:** **WebSockets** (not REST). Maintains a persistent, open pipe between Client and Server.
+- **Transport:** **WebSockets** Maintains a persistent, open pipe between Client and Server.
 - **Serialization:** **MessagePack (MsgPack)**.
   - **Role:** Compresses data into binary format.
   - **Data Type:** Transmits **Binary Arrays** (Float64).
   - **Flow:** Python (NumPy Array) $\to$ MsgPack $\to$ WebSocket $\to$ JS (Float64Array) $\to$ SciChart (Wasm Memory).
 
-### 4. The Speed Layer (State & Caching)
+### 4. State & Caching
 
 - **Technology:** **Redis**.
 - **Deployment:** Local **Docker** container (`redis:latest` on port `6379`).
@@ -72,19 +77,12 @@ This is a **Hedge-Fund Grade** SaaS application designed for high-frequency stra
 - **Manager:** `npm`.
 - **Core Libraries:**
   - `next`, `react`: App framework.
-  - `scichart`: High-performance charting.
+  - `echarts`: High-performance charting.
   - `@msgpack/msgpack`: Binary deserialization.
 
 ### Infrastructure
 
-- **Docker:** Runs the local Redis instance.
-
-  - Command: `docker run --name local-redis -p 6379:6379 -d redis`
-
-  1. Run docker desktop for Redis: docker run --name local-redis -p 6379:6379 -d redis
-  2. Setup backend: cd Backend python3.13 -m venv venv
-  3. Activate environment : venv\Scripts\activate
-  4. Install backend framework pip install "numpy>=2.0,<2.4" "numba==0.62.1" vectorbt fastapi uvicorn websockets msgpack redis yfinance
-  5. Create server file main.py
-  6. Create front-end npm install scichart @msgpack/msgpack
-  7.
+1. Run Docker - Redis `docker start local-redis`
+2. Run Python VE: `.\.venv\Scripts\Activate.ps1`
+3. Run fastAPI - `uvicorn backend.main:app --reload --host 0.0.0.0 --port 8000`
+4. Run react Front End -`npm run dev`
