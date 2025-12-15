@@ -1,13 +1,6 @@
-## Project Philosophy
+## Project 
 
-Designed for high-frequency strategy backtesting and execution. The core architectural constraint is **ultra-low latency**.
-
-## TODO: Add AI integration, for LLM based contests running on cron
-
-1. Add AI chat interface --> trading schema (zod)
-2. Confirm startegy - Loopback (natural language)
-3. Turn schema into API request (simulate)
-4. Cron every x hours
+Designed for high-frequency strategy backtesting and eventually execution. 
 
 ## The Architecture:
 
@@ -86,3 +79,10 @@ Designed for high-frequency strategy backtesting and execution. The core archite
 2. Run Python VE: `.\.venv\Scripts\Activate.ps1`
 3. Run fastAPI - `uvicorn backend.main:app --reload --host 0.0.0.0 --port 8000`
 4. Run react Front End -`npm run dev`
+
+## TODO: Add AI integration, for LLM based contests running on cron
+
+1. Add AI chat interface --> trading schema (zod)
+2. Confirm startegy - Loopback (natural language)
+3. Turn schema into API request (simulate)
+4. Cron every x hours
