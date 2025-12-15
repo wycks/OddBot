@@ -34,7 +34,7 @@ Designed for high-frequency strategy backtesting and execution. The core archite
 - **Serialization:** **MessagePack (MsgPack)**.
   - **Role:** Compresses data into binary format.
   - **Data Type:** Transmits **Binary Arrays** (Float64).
-  - **Flow:** Python (NumPy Array) $\to$ MsgPack $\to$ WebSocket $\to$ JS (Float64Array) $\to$ SciChart (Wasm Memory).
+  - **Flow:** Python (NumPy Array) $\to$ MsgPack $\to$ WebSocket $\to$ JS (Float64Array) $\to$ eCharts (Wasm Memory).
 
 ### 4. State & Caching
 
