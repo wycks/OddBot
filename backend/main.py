@@ -1,11 +1,12 @@
 # Backend/main.py
-from fastapi import FastAPI, WebSocket
-from fastapi.middleware.cors import CORSMiddleware
-import vectorbt as vbt
-import redis
+import asyncio
+
 import msgpack
 import numpy as np
-import asyncio
+import redis
+import vectorbt as vbt
+from fastapi import FastAPI, WebSocket
+from fastapi.middleware.cors import CORSMiddleware
 
 app = FastAPI()
 
@@ -31,7 +32,7 @@ app.add_middleware(
 
 # Connect to Local Redis
 try:
-    r_cache = redis.Redis(host='localhost', port=6379, db=0)
+    r_cache = redis.Redis(host="localhost", port=6379, db=0)
     r_cache.ping()
     print("Connected to Redis Speed Layer")
 except Exception as e:
@@ -53,19 +54,31 @@ async def health_check():
         status["redis"] = "down"
     return status
 
+
+# Load config
+import json
+
+with open("backend/config.json") as f:
+    config = json.load(f)
+
 # Pre-load Data into RAM (Simulating Hedge Fund Cache) from YFData = Yahoo Finance
 print("Pre-loading Market Data...")
-# Fetching 1 year of hourly data for speed demo
-price_data = vbt.YFData.download("BTC-USD", period="1y", interval="1h").get('Close')
+print(
+    f"Config: {config['symbol']}, period={config['period']}, interval={config['interval']}"
+)
+price_data = vbt.YFData.download(
+    config["symbol"], period=config["period"], interval=config["interval"]
+).get("Close")
 print("Data Loaded into RAM")
 
 #  TODO Add save to DB functionality
+
 
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
     await websocket.accept()
     print("Client Connected via WebSocket")
-    
+
     try:
         while True:
             # 1. Receive Binary Data (Fast)
@@ -73,7 +86,7 @@ async def websocket_endpoint(websocket: WebSocket):
             params = msgpack.unpackb(raw_data, raw=False)
 
             # 2. Extract Parameters
-            window = int(params.get('ma_window', 20))
+            window = int(params.get("ma_window", 20))
             # build a cache key for this parameter set (simple example)
             cache_key = f"backtest:ma:{window}".encode()
 
@@ -84,7 +97,7 @@ async def websocket_endpoint(websocket: WebSocket):
                 await websocket.send_bytes(cached)
                 continue
 
-            # 4. Try to read from Redis cache 
+            # 4. Try to read from Redis cache
             if r_cache is not None:
                 try:
                     r = r_cache.get(cache_key)
@@ -97,19 +110,30 @@ async def websocket_endpoint(websocket: WebSocket):
                 except Exception as e:
                     print(f"Redis read error: {e}")
 
-            # 5. Run VectorBT 
+            # 5. Run VectorBT
             def run_backtest(window_arg):
                 fast_ma = vbt.MA.run(price_data, window=window_arg)
                 entries = fast_ma.ma_crossed_above(price_data)
                 exits = fast_ma.ma_crossed_below(price_data)
                 pf = vbt.Portfolio.from_signals(price_data, entries, exits)
                 equity = pf.value()
-                timestamps = (equity.index.astype(np.int64) // 10**9).tolist()
+                # Convert index to Unix seconds regardless of internal resolution
+                ts_ns = equity.index.astype(np.int64)
+                if ts_ns[0] > 1e12:  # nanoseconds → seconds
+                    timestamps = (ts_ns // 10**9).tolist()
+                else:  # already seconds
+                    timestamps = ts_ns.tolist()
                 values = equity.values.tolist()
+                # Price and MA data for the bottom chart overlay
+                ma_series = fast_ma.ma
+                ma_vals = [None if np.isnan(v) else float(v) for v in ma_series.values]
+                price_vals = price_data.values.tolist()
                 result = {
                     "roi": pf.total_return(),
                     "timestamps": timestamps,
-                    "values": values
+                    "values": values,
+                    "price_values": price_vals,
+                    "ma_values": ma_vals,
                 }
                 return msgpack.packb(result, use_bin_type=True)
 
@@ -132,6 +156,6 @@ async def websocket_endpoint(websocket: WebSocket):
 
             # 6. Send Binary Response
             await websocket.send_bytes(packed)
-            
+
     except Exception as e:
         print(f"Client Disconnected: {e}")
